@@ -4,12 +4,12 @@
     <link rel="stylesheet" href="resources/style.css" type="text/css">
     <!-- TODO: move this to my server. -->
     <script src="http://openlayers.org/en/v3.13.0/build/ol.js" type="text/javascript"></script>
-    <!-- <script src="/socket.io/socket.io.js"></script> -->
-    <!-- <script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
       var socket=io();
+
     </script>
--->
-    <title>Openlayers 3 example</title>
+    <title>piChart</title>
   </head>
   <body>
     <div id="map" class="map"></div>
@@ -128,8 +128,7 @@
 		//			      'EPSG:3857')),
       });
 
-      var iconStyle = new ol.style.Style({
-	  image: new ol.style.Icon(/** @type {olx.style.IconOptions} */ ({
+      var boatIcon = new ol.style.Icon(/** @type {olx.style.IconOptions} */ ({
 	      // anchor: [0.5, 46], // boatPosition,
 	      // anchor: [0.5, 0.5], // boatPosition,
 	      // anchorXUnits: 'fraction',
@@ -139,10 +138,19 @@
 	      rotation: boatHeadingRad,
 	      rotateWithView: true,
 	      src: 'resources/sunwind-icon2.svg'
-	  }))
+      }));
+
+      var iconStyle = new ol.style.Style({
+	  image: boatIcon
       });
 
       boatIconFeature.setStyle(iconStyle);
+
+    socket.on( 'navInfo', function(msg) {
+	// console.log("New COG: " + msg.COG );
+	boatIcon.setRotation( msg.COG * Math.PI / 180 );
+	boatIconFeature.changed();
+    }  );
 
       /* Boat speed vector */
       // speed vector length is distance travelled in five minutes

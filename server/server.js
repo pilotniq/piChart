@@ -13,7 +13,6 @@ var http = require('http');
 var dispatcher = require('httpdispatcher');
 var fs = require('fs');
 // socket.io is work in progress.
-var io = require('socket.io')(http);
 
 //Lets define a port we want to listen to
 const PORT=8080; 
@@ -25,6 +24,8 @@ if ( typeof String.prototype.endsWith != 'function' )
 
 //Create a server
 var server = http.createServer(handleRequest);
+
+var io = require('socket.io')(server);
 
 //Lets start our server
 server.listen(PORT, function(){
@@ -90,4 +91,17 @@ function handleRequest(request, response){
         console.log(err);
     }
 }
+
+var boatInfo = { position: [17.998, 59,03685], COG: 45, HDG: 45, VMG: 0 };
+    
+function updateBoat()
+{
+    boatInfo.COG = boatInfo.COG + 1;
+    
+    io.emit( 'navInfo', boatInfo /* { for: 'everyone' } */ );
+}
+
+/* Set up boat simulation */
+// 5 Hz update rate to start with
+setInterval( updateBoat, 500 );
 
