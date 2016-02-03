@@ -148,8 +148,9 @@
 
     socket.on( 'navInfo', function(msg) {
 	// console.log("New COG: " + msg.COG );
-	boatIcon.setRotation( msg.COG * Math.PI / 180 );
-	boatIconFeature.changed();
+        boatIcon.setRotation( msg.COG * Math.PI / 180 );
+        boatIconFeature.setGeometry( new ol.geom.Point( ol.proj.fromLonLat( msg.position ) ) );
+	// boatIconFeature.changed();
     }  );
 
       /* Boat speed vector */

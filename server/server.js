@@ -12,6 +12,8 @@
 var http = require('http');
 var dispatcher = require('httpdispatcher');
 var fs = require('fs');
+var LatLon = require( 'mt-latlon' );
+
 // socket.io is work in progress.
 
 //Lets define a port we want to listen to
@@ -92,13 +94,45 @@ function handleRequest(request, response){
     }
 }
 
-var boatInfo = { position: [17.998, 59,03685], COG: 45, HDG: 45, VMG: 0 };
-    
+var waypoints = [ { position: new LatLon(59.03685, 17.998 ), speed: 2.0 },
+		  { position: new LatLon(59.0357, 18.0042 ), speed: 4.0 },
+		  { position: new LatLon(59.0241, 18.0133 ), speed: 4.0 },
+  		  { position: new LatLon(59.0154, 18.0289 ), speed: 5.0 },
+  		  { position: new LatLon(59.0171, 18.0471 ), speed: 5.0 },
+  		  { position: new LatLon(59.0347, 18.06384 ), speed: 5.0 } ];
+
+		  
+var boatInfo = { position: waypoints[0].position, COG: 45, HDG: 45, VMG: waypoints[0].speed };
+
+var waypointIndex = 0;
+// calculate initial heading between waypoint 0 and 1
+boatInfo.COG = 45; // waypoints[0].position.bearingTo( waypoints[1].position );
+boatInfo.HDG = boatInfo.COG;
+
+var speed = waypoints[0].speed * 0.5144; // knots to m/s
+var lastTime = new Date();
+
 function updateBoat()
 {
-    boatInfo.COG = boatInfo.COG + 1;
-    
-    io.emit( 'navInfo', boatInfo /* { for: 'everyone' } */ );
+    var now = new Date();
+    var dt = now - lastTime;
+    lastTime = now;
+
+    boatInfo.position = boatInfo.position.destinationPoint( boatInfo.COG, dt * speed / (1000 * 1000) );
+
+    var nextWaypoint = waypoints[ waypointIndex + 1 ];
+    if( boatInfo.position.distanceTo( nextWaypoint.position ) < 0.005 )
+    {
+	// less than five meters to the waypoint, switch waypoint
+	waypointIndex++;
+	speed = waypoints[ waypointIndex ].speed * 0.5144;;
+    }
+
+    boatInfo.COG = boatInfo.position.bearingTo( waypoints[ waypointIndex + 1 ].position );
+    boatInfo.HDG = boatInfo.COG;
+
+    // should convert speed back to knots here
+    io.emit( 'navInfo', { position: [boatInfo.position.lon(), boatInfo.position.lat()], COG: boatInfo.COG, HDG: boatInfo.HDG, speed: speed } );
 }
 
 /* Set up boat simulation */
