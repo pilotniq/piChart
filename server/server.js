@@ -14,8 +14,6 @@ var dispatcher = require('httpdispatcher');
 var fs = require('fs');
 var LatLon = require( 'mt-latlon' );
 
-// socket.io is work in progress.
-
 //Lets define a port we want to listen to
 const PORT=8080; 
 
@@ -100,7 +98,7 @@ var waypoints = [ { position: new LatLon(59.03685, 17.998 ), speed: 2.0 },
   		  { position: new LatLon(59.0154, 18.0289 ), speed: 5.0 },
   		  { position: new LatLon(59.0171, 18.0471 ), speed: 5.0 },
   		  { position: new LatLon(59.0347, 18.06384 ), speed: 5.0 } ];
-
+var waypointDirection = 1; // -1 when returning
 		  
 var boatInfo = { position: waypoints[0].position, COG: 45, HDG: 45, VMG: waypoints[0].speed };
 
@@ -109,26 +107,43 @@ var waypointIndex = 0;
 boatInfo.COG = 45; // waypoints[0].position.bearingTo( waypoints[1].position );
 boatInfo.HDG = boatInfo.COG;
 
-var speed = waypoints[0].speed * 0.5144; // knots to m/s
+var speedUp = 10;
+var speed = waypoints[0].speed * 0.5144 * speedUp ; // knots to m/s sped up 10 times for testing.
 var lastTime = new Date();
 
 function updateBoat()
 {
     var now = new Date();
     var dt = now - lastTime;
+    var maxTurnRate = 10;
     lastTime = now;
 
     boatInfo.position = boatInfo.position.destinationPoint( boatInfo.COG, dt * speed / (1000 * 1000) );
 
-    var nextWaypoint = waypoints[ waypointIndex + 1 ];
-    if( boatInfo.position.distanceTo( nextWaypoint.position ) < 0.005 )
+    var nextWaypoint = waypoints[ waypointIndex + waypointDirection ];
+    var distanceToNext = boatInfo.position.distanceTo( nextWaypoint.position );
+    
+    if( distanceToNext < 0.005 * speedUp )
     {
 	// less than five meters to the waypoint, switch waypoint
-	waypointIndex++;
-	speed = waypoints[ waypointIndex ].speed * 0.5144;;
+	waypointIndex+=waypointDirection;
+	if( (waypointIndex == (waypoints.length - 1)) && (waypointDirection == 1))
+	    waypointDirection = -1;
+	else if( (waypointIndex == 0) && (waypointDirection == -1))
+	    waypointDirection = 1;
+
+	speed = waypoints[ waypointIndex ].speed * 0.5144 * speedUp;
     }
 
-    boatInfo.COG = boatInfo.position.bearingTo( waypoints[ waypointIndex + 1 ].position );
+    var bearing = boatInfo.position.bearingTo( waypoints[ waypointIndex + waypointDirection ].position );
+    var preCOG = boatInfo.COG;
+    var courseDiff = bearing - boatInfo.COG;
+    if( courseDiff > maxTurnRate )
+	courseDiff = maxTurnRate;
+    else if( courseDiff < -maxTurnRate)
+	courseDiff = -maxTurnRate;
+
+    boatInfo.COG += courseDiff;
     boatInfo.HDG = boatInfo.COG;
 
     // should convert speed back to knots here

@@ -167,8 +167,6 @@
 
       var coordinates = [boatPosition, vectorEnd];
       var boatSpeedFeature = new ol.Feature({
-	  // geometry: new ol.geom.Point([0, 0]),
-	  // geometry: new ol.geom.Point( [0, 0]) // ,boatPosition // new ol.geom.Point([0, 0]),
 	  geometry: new ol.geom.LineString( coordinates )
 	  // geometry: new ol.geom.Point(ol.proj.transform([18.5, 59.5], 'EPSG:4326',
 		//			      'EPSG:3857')),
@@ -188,8 +186,10 @@
 	  target: 'map',
 	  renderer: 'canvas',
           layers: [
-	      // tmsChart,
-	      XYZChartLayer,
+	      new ol.layer.Tile({
+		  source: new ol.source.OSM()
+	      }),
+	      // XYZChartLayer,
 	      iconLayer,
 	      new ol.layer.Tile({
 		  source: new ol.source.TileDebug({
@@ -199,35 +199,9 @@
 		      })
 		  })
 	      })
-	      
-	      
-	      /*
-          new ol.layer.Tile({
-            source: new ol.source.MapQuest({layer: 'sat'})
-          }),
-*/
-
         ],
           view: myView
-//      view: new ol.View({
-//          center: ol.proj.fromLonLat([18.5, 59.5]),
-//          zoom: 7,
-	  //           maxZoom: 17 })
       });
-/*
-      var map = new ol.Map({
-        target: 'map',
-        layers: [
-          new ol.layer.Tile({
-            source: new ol.source.MapQuest({layer: 'sat'})
-          })
-        ],
-        view: new ol.View({
-          center: ol.proj.fromLonLat([37.41, 8.82]),
-          zoom: 4
-        })
-      });
-*/
     </script>
 
   </body>
