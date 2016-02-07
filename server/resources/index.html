@@ -23,8 +23,8 @@
 
       var boat = new ol.Feature( { geometry: new ol.geom.Polygon( [ ] )} );
 
-      var boatPosition = ol.proj.fromLonLat([17.998, 59.03685]);
-      var boatHeadingRad = Math.PI * 45 / 180;
+      var boatPosition = ol.proj.fromLonLat([17.998, 59.03685]); // in meters
+      var boatHeadingRad = Math.PI * 0 / 180;
       var boatSpeedKnots = 4; // knots
 
       var myView = new ol.View({
@@ -47,11 +47,13 @@
             // zoom in
             // myView.setZoom( myView.getZoom( ) + 1 );
             myView.setResolution( myView.getResolution( ) * 0.95 );
+	    myView.setCenter( newDesiredCenterPosition() );
             break;
 
           case 189: // minus, zoom out
             // myView.setZoom( myView.getZoom( ) - 1 );
             myView.setResolution( myView.getResolution( ) * 1.05 );
+	    myView.setCenter( newDesiredCenterPosition());
             break;
 
           default:
@@ -146,31 +148,76 @@
 
       boatIconFeature.setStyle(iconStyle);
 
-    socket.on( 'navInfo', function(msg) {
-	// console.log("New COG: " + msg.COG );
-        boatIcon.setRotation( msg.COG * Math.PI / 180 );
-        boatIconFeature.setGeometry( new ol.geom.Point( ol.proj.fromLonLat( msg.position ) ) );
-	// boatIconFeature.changed();
-    }  );
+var firstPositionSet = false;
 
-      /* Boat speed vector */
-      // speed vector length is distance travelled in five minutes
-      var knotsToMetersPerSecond = 1852 / 3600;
-      var boatSpeedMetersPerSecond = boatSpeedKnots * knotsToMetersPerSecond;
-      var fiveMinuteDistance = boatSpeedMetersPerSecond * 5 * 60; // will be 617 meters
-      var vectorX = fiveMinuteDistance * Math.sin( boatHeadingRad );
-      var vectorY = fiveMinuteDistance * Math.cos( boatHeadingRad );
-
-      // TODO: need to fix vectorX and vectorY in all quadrants
-      var vectorEnd = boatPosition.slice(0); // clones the array
-      vectorEnd = ol.coordinate.add( vectorEnd, [vectorX, vectorY ] );
-
-      var coordinates = [boatPosition, vectorEnd];
+     // create this before creating socket listener
       var boatSpeedFeature = new ol.Feature({
-	  geometry: new ol.geom.LineString( coordinates )
+	  geometry: new ol.geom.LineString( [boatPosition, boatPosition ] ) // coordinates )
 	  // geometry: new ol.geom.Point(ol.proj.transform([18.5, 59.5], 'EPSG:4326',
 		//			      'EPSG:3857')),
       });
+
+    socket.on( 'navInfo', function(msg) {
+	// console.log("New COG: " + msg.COG );
+	boatPosition = ol.proj.fromLonLat( msg.position ); // in meters
+	boatHeadingRad = msg.COG * Math.PI / 180;
+	
+        boatIcon.setRotation( boatHeadingRad );
+        boatIconFeature.setGeometry( new ol.geom.Point( boatPosition ) );
+
+	       // boatIconFeature.changed();
+
+         // todo: move map center.
+         // desired map center: boat is in opposite direction of heading from
+         // center, 80% of the way to the edge. Don't move map center
+         // dramatically, make slow, gradual moves.
+        var newDesiredCenter = newDesiredCenterPosition();
+
+	if( firstPositionSet )
+	{
+	 var oldCenter = myView.getCenter();
+         var delta = [newDesiredCenter[0] - oldCenter[0], newDesiredCenter[1] - oldCenter[1] ];
+         var deltaLength = Math.sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+
+	var resolution = myView.getResolution(); // m / pixel
+	var maxMovementMeters = 5 * resolution;
+
+	 if( deltaLength > maxMovementMeters ) // 
+	 {
+	     delta = [delta[0] * maxMovementMeters / deltaLength, delta[1] * maxMovementMeters / deltaLength ];
+	 }
+
+         myView.setCenter( [oldCenter[0] + delta[0], oldCenter[1] + delta[1] ] );
+	}
+	else
+	{
+	    myView.setCenter( newDesiredCenter );
+	    updateSpeedVector();
+	    firstPositionSet = true;
+	}
+
+	updateSpeedVector();
+      }  );
+
+
+      function updateSpeedVector()
+      {
+        /* Boat speed vector */
+        // speed vector length is distance travelled in five minutes
+        var knotsToMetersPerSecond = 1852 / 3600;
+        var boatSpeedMetersPerSecond = boatSpeedKnots * knotsToMetersPerSecond;
+        var fiveMinuteDistance = boatSpeedMetersPerSecond * 5 * 60; // will be 617 meters
+        var vectorX = fiveMinuteDistance * Math.sin( boatHeadingRad );
+        var vectorY = fiveMinuteDistance * Math.cos( boatHeadingRad );
+
+        // TODO: need to fix vectorX and vectorY in all quadrants
+        var vectorEnd = boatPosition.slice(0); // clones the array
+        vectorEnd = ol.coordinate.add( vectorEnd, [vectorX, vectorY ] );
+
+	  var coordinates = [boatPosition, vectorEnd];
+	  boatSpeedFeature.setGeometry( new ol.geom.LineString( coordinates ) );
+      }
+
 
       var iconSource = new ol.source.Vector({
 	  features: [ boatIconFeature, boatSpeedFeature]
@@ -186,11 +233,10 @@
 	  target: 'map',
 	  renderer: 'canvas',
           layers: [
-	      new ol.layer.Tile({
-		  source: new ol.source.OSM()
-	      }),
-	      // XYZChartLayer,
+	      new ol.layer.Tile({ source: new ol.source.OSM() }), // Open Streetmap layer
+	      // XYZChartLayer, // offline tile layer
 	      iconLayer,
+	      /*
 	      new ol.layer.Tile({
 		  source: new ol.source.TileDebug({
 		      projection: 'EPSG:3857',
@@ -199,9 +245,85 @@
 		      })
 		  })
 	      })
+*/
         ],
           view: myView
-      });
+    });
+
+      // Set original map center
+    
+      // the desired world distance from the center of the map to the boat
+      // is
+      //
+      // At the end we want position in meters to set position?
+      // 
+      // The boat will either be at a desired X distance from edge or Y distance
+      // Take the map width in pixels * 0.4 * resolution (meters / pixel) to get desired center position to the right of the boat.
+      // Take the map height in pixels * 0.4 * resolution to get desired center position above/below the boat.
+      //
+
+      function newDesiredCenterPosition()
+      {
+        var mapSize = map.getSize(); // in pixelss
+        // console.log( "mapSize = " + mapSize[0] + ", " + mapSize[1] );
+
+        // desiredXY is the desired number of pixels from the boat to the center.
+        var desiredXY; //  = [mapSize[0] * 0.35, mapSize[1] * 0.35];
+        var resXY;
+        var quadrant = Math.floor((boatHeadingRad * 2 / Math.PI) % 4);
+
+        // console.log( "Quadrant=" + quadrant + ", headingRad=" + boatHeadingRad + " = " + boatHeadingRad * 180 / Math.Pi + " degrees" );
+
+        switch( quadrant )
+        {
+	  case 0:
+            desiredXY = [mapSize[0] * 0.35, mapSize[1] * 0.35 ]; // mapSize[1] * 0.35];
+            resXY = [Math.tan( boatHeadingRad ) * desiredXY[0], desiredXY[1] / Math.tan( boatHeadingRad ) ]; // distance from center in pixels
+	    break;
+
+	  case 1:
+            desiredXY = [ -mapSize[0] * 0.35, -mapSize[1] * 0.35 ]; 
+
+            resXY = [Math.tan( boatHeadingRad ) * desiredXY[0], -desiredXY[1] / Math.tan( boatHeadingRad ) ]; // distance from center in pixels
+	    break;
+
+	  case 2:
+            desiredXY = [-mapSize[0] * 0.35, -mapSize[1] * 0.35 ]; // mapSize[1] * 0.35];
+
+            resXY = [Math.tan( boatHeadingRad ) * desiredXY[0], -desiredXY[1] / Math.tan( boatHeadingRad ) ]; // distance from center in pixels
+  	    break;
+
+	  case 3:
+            desiredXY = [-mapSize[0] * 0.35, mapSize[1] * 0.35 ]; // mapSize[1] * 0.35];
+
+            resXY = [-Math.tan( boatHeadingRad ) * desiredXY[0], -desiredXY[1] / Math.tan( boatHeadingRad ) ]; // distance from center in pixels
+  	    break;
+
+	  default:
+   	    alert( "bug, headingRad=" + boatHeadingRad + ", quadrant =" + quadrant );
+	  break;
+        }
+
+        var centerPixel;
+
+        if( Math.abs(resXY[0]) > Math.abs(desiredXY[0]) ) // X is out of bounds, assume boat Y is at desiredY
+        {
+          // boat X is at 
+	  boatPixel = [ desiredXY[0], resXY[1] ]; // work in progress
+        }
+        else
+        {
+	  // var boatY = 
+	  boatPixel = [ resXY[0], desiredXY[ 1 ] ];
+        }
+
+        var resolution = myView.getResolution();
+
+        var centerPosition = [boatPosition[0] + boatPixel[0] * resolution, boatPosition[1] + boatPixel[1] * resolution];
+          // console.log( "Y = " + boatPosition[1] + " + " + boatPixel[1] + " * " + resolution + " = " + centerPosition[1] );
+
+	  return centerPosition;
+      }
     </script>
 
   </body>

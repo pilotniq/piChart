@@ -107,7 +107,7 @@ var waypointIndex = 0;
 boatInfo.COG = 45; // waypoints[0].position.bearingTo( waypoints[1].position );
 boatInfo.HDG = boatInfo.COG;
 
-var speedUp = 10;
+var speedUp = 2;
 var speed = waypoints[0].speed * 0.5144 * speedUp ; // knots to m/s sped up 10 times for testing.
 var lastTime = new Date();
 
